@@ -77,6 +77,8 @@ func StartHTTPServer() {
 
 	http.HandleFunc(basePath+"/hotels", fetchHotelsHandler)
 
+	fmt.Println("Starting HTTP server at port 8080...")
+
 	err := http.ListenAndServe(":8080", nil)
 	if err != nil {
 		fmt.Println("error starting server")
