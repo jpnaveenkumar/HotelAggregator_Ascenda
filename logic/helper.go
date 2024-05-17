@@ -4,6 +4,7 @@ import (
 	"ascenda/common"
 	"errors"
 	"fmt"
+	"strings"
 )
 
 func getDestination(id string) (int64, error) {
@@ -28,6 +29,47 @@ func getName(id string) (string, error) {
 		return name, nil
 	}
 	return "", errors.New("no name found")
+}
+
+func transformAmenities(amenity string) string {
+	amenity = strings.ToLower(amenity)
+	amenity = strings.Join(strings.Split(amenity, " "), "")
+	return amenity
+}
+
+func mergeArr(source []string, destination []string) []string {
+	final := []string{}
+	lookup := map[string]bool{}
+	total := append(source, destination...)
+	for _, src := range total {
+		transformedSRC := transformAmenities(src)
+		fmt.Println(transformedSRC)
+		if ok, _ := lookup[transformedSRC]; !ok {
+			lookup[transformedSRC] = true
+			final = append(final, strings.TrimSpace(src))
+		}
+	}
+	return final
+}
+
+func mergeMaps(source map[string][]string, destination map[string][]string) map[string][]string {
+	for key, val := range source {
+		destination[key] = mergeArr(val, destination[key])
+	}
+	return destination
+}
+
+func getAmenitiesV2(id string) (map[string][]string, error) {
+	totalAmenitites := map[string][]string{}
+	for _, supplier := range keyVsDataSource {
+		supplierAmenities, err := supplier.GetAmenities(id)
+		if err != nil {
+			return nil, err
+		}
+		totalAmenitites = mergeMaps(supplierAmenities, totalAmenitites)
+	}
+	fmt.Println(totalAmenitites)
+	return totalAmenitites, nil
 }
 
 func getAmenities(id string) (map[string][]string, error) {

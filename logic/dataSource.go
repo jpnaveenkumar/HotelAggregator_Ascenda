@@ -6,6 +6,7 @@ import (
 	"ascenda/suppliers/paperflies"
 	"ascenda/suppliers/patagonia"
 	"fmt"
+	"sync"
 )
 
 var (
@@ -34,6 +35,8 @@ func GetHotelsByDestinationID(destinationID int64) []*common.Hotel {
 	return nil
 }
 
+// amenities -> ACME && PATAGONIA , PATAGONIA && PAPERFLIES
+
 func buildDataSourceOrderingForField() {
 	FieldVsDataSourceOrdering[common.FieldID] = []string{common.SupplierACME, common.SupplierPatagonia, common.SupplierPaperFlies}
 	FieldVsDataSourceOrdering[common.FieldDestinationID] = []string{common.SupplierACME, common.SupplierPatagonia, common.SupplierPaperFlies}
@@ -50,33 +53,51 @@ func buildDataSourceOrderingForField() {
 }
 
 func buildDataSource() {
-	acmeSource, err := acme.Init()
-	if err != nil {
-		fmt.Printf("failed to initialize datasource : %v", common.SupplierACME)
-	} else {
-		keyVsDataSource[common.SupplierACME] = acmeSource
-	}
 
-	paperFliesSource, err := paperflies.Init()
-	if err != nil {
-		fmt.Printf("failed to initialize datasource : %v", common.SupplierPaperFlies)
-	} else {
-		keyVsDataSource[common.SupplierPaperFlies] = paperFliesSource
-	}
+	wg := sync.WaitGroup{}
 
-	patagoniaSource, err := patagonia.Init()
-	if err != nil {
-		fmt.Printf("failed to initialize datasource : %v", common.SupplierPatagonia)
-	} else {
-		keyVsDataSource[common.SupplierPatagonia] = patagoniaSource
-	}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		acmeSource, err := acme.Init()
+		if err != nil {
+			fmt.Printf("failed to initialize datasource : %v", common.SupplierACME)
+		} else {
+			keyVsDataSource[common.SupplierACME] = acmeSource
+		}
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		paperFliesSource, err := paperflies.Init()
+		if err != nil {
+			fmt.Printf("failed to initialize datasource : %v", common.SupplierPaperFlies)
+		} else {
+			keyVsDataSource[common.SupplierPaperFlies] = paperFliesSource
+		}
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		patagoniaSource, err := patagonia.Init()
+		if err != nil {
+			fmt.Printf("failed to initialize datasource : %v", common.SupplierPatagonia)
+		} else {
+			keyVsDataSource[common.SupplierPatagonia] = patagoniaSource
+		}
+	}()
+
+	wg.Wait()
 }
 
-func buildDataset() {
+func buildDataset() error {
 	for key, dataSource := range keyVsDataSource {
 		hotelIDS, err := dataSource.GetAllHotelIDs()
 		if err != nil {
 			fmt.Printf("failed to fetch hotelIDs from datasource=%v with err=%v", key, err)
+			return err
 		}
 		for _, hotelID := range hotelIDS {
 			if _, ok := hotelIDsVsDataSource[hotelID]; !ok {
@@ -107,7 +128,7 @@ func buildDataset() {
 			hotel.Name = name
 		}
 
-		amenities, err := getAmenities(hotelID)
+		amenities, err := getAmenitiesV2(hotelID)
 		if err != nil {
 			fmt.Printf("failed to fetch amenities for hotelID=%v with err=%v", hotelID, err)
 		} else {
@@ -173,6 +194,7 @@ func buildDataset() {
 
 		hotel.Location = location
 	}
+	return nil
 }
 
 func PrepareDataSource() {
